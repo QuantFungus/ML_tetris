@@ -1,0 +1,11 @@
+For insight on how to do random maze generation, I spoke with one of my GSAS professors. 
+He recommended I try a modified version of the DFS algorithm, some notes on how to go about it:
+
+1. Initialize an n x m grid for the maze, fill each spot with a wall
+2. Pick a random initial spot on the maze, label it as "visited" and begin the DFS
+3. Look at each neighbor and pick an "unvisited" neighboring spot at random, move to it and label it "visited". Keep track of the path we're making (used in step 5).
+4. Repeat the process of picking a random unvisited neighbor
+5. If there is a point where we reach a dead end, back track through our recorded path. At each spot we back track too, check to see if there are unvisited spots.
+6. If an unvisited spot is eventually found while back tracking (if multiple spots found, pick at random), continue the algorithm on it and keep track of new path
+7. Once we hit a dead end and cannot find anymore unvisited spots, we should have a brand new randomly generated maze of the requested n x m size.
+
