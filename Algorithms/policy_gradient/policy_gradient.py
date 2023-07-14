@@ -1,9 +1,12 @@
-import gym
+import gymnasium as gym
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Categorical
+import time
+import matplotlib.pyplot as plt
 
 # Define the Policy Network
 class Policy(nn.Module):
@@ -18,7 +21,7 @@ class Policy(nn.Module):
         return F.softmax(x, dim=1)
 
 # Create the environment
-env = gym.make('CartPole-v1')
+env = gym.make('CartPole-v1',render_mode="rgb_array")
 state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.n
 
@@ -30,6 +33,7 @@ optimizer = optim.Adam(policy.parameters(), lr=0.01)
 
 # Function to select an action based on the policy
 def select_action(state):
+    state = np.array(state)
     state = torch.from_numpy(state).float().unsqueeze(0)
     probs = policy(state)
     m = Categorical(probs)
@@ -41,16 +45,18 @@ def policy_gradient():
     num_episodes = 1000
     gamma = 0.99
 
+    # for 1000 episodes
     for episode in range(num_episodes):
-        state = env.reset()
+        observations = env.reset()
+        state = np.array(observations[0])
         episode_reward = 0
         log_probs = []
         rewards = []
 
+        # loop through each time step in one episode
         while True:
             action, log_prob = select_action(state)
-            next_state, reward, done, _ = env.step(action)
-            env.render()
+            next_state, reward, done, _, _ = env.step(action)
 
             log_probs.append(log_prob)
             rewards.append(reward)
@@ -60,6 +66,17 @@ def policy_gradient():
                 break
 
             state = next_state
+            """
+            if episode == 1000:
+                env.render()
+                time.sleep(0.01)
+            """
+            # Visualize the frame
+            frame = env.render(mode='rgb_array')
+            plt.imshow(frame)
+            plt.axis('off')
+            plt.show()
+            
 
         # Compute the discounted rewards
         discounts = [gamma**i for i in range(len(rewards))]
