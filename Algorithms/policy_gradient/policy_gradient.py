@@ -6,7 +6,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Categorical
 import time
-import matplotlib.pyplot as plt
+import cv2
 
 # Define the Policy Network
 class Policy(nn.Module):
@@ -45,6 +45,9 @@ def policy_gradient():
     num_episodes = 1000
     gamma = 0.99
 
+    # Create a VideoWriter object
+    video_writer = cv2.VideoWriter('cartpole_video.avi', cv2.VideoWriter_fourcc(*'XVID'), 30.0, (600, 400))
+
     # for 1000 episodes
     for episode in range(num_episodes):
         observations = env.reset()
@@ -66,16 +69,11 @@ def policy_gradient():
                 break
 
             state = next_state
-            """
-            if episode == 1000:
-                env.render()
-                time.sleep(0.01)
-            """
             # Visualize the frame
-            frame = env.render(mode='rgb_array')
-            plt.imshow(frame)
-            plt.axis('off')
-            plt.show()
+            frame = env.render()
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert color channels from RGB to BGR for video
+            frame = cv2.resize(frame, (600, 400))  # Resize the frame to fit the video dimensions
+            video_writer.write(frame)
             
 
         # Compute the discounted rewards
@@ -103,6 +101,10 @@ def policy_gradient():
         # Print the episode statistics
         if episode % 10 == 0:
             print('Episode {}: reward = {}'.format(episode, episode_reward))
+    
+    # Release the VideoWriter object
+    video_writer.release()
+
 
 # Train the policy network
 policy_gradient()
