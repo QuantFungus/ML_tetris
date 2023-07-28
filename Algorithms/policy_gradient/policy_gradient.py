@@ -1,14 +1,16 @@
-import gymnasium as gym
 import numpy as np
 import torch
+import gymnasium as gym
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Categorical
-import time
+import matplotlib.pyplot as plt
 import cv2
+import tqdm as tqdm
 
-# Define the Policy Network
+
+# Define the policy approximater, using Neural Network
 class Policy(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Policy, self).__init__()
@@ -20,91 +22,136 @@ class Policy(nn.Module):
         x = self.fc2(x)
         return F.softmax(x, dim=1)
 
-# Create the environment
-env = gym.make('CartPole-v1',render_mode="rgb_array")
-state_dim = env.observation_space.shape[0]
-action_dim = env.action_space.n
 
-# Initialize the policy network
-policy = Policy(state_dim, action_dim)
 
-# Define the optimizer
-optimizer = optim.Adam(policy.parameters(), lr=0.01)
+class PolicyGradient:
+    def __init__(self,env,plot_info=True,run_episodes = 10000,gamma=0.99,show_traces=False):
+        # Initialize the environment, Policy approximater and optimizer
+        self.env = env
+        self.state_dim = env.observation_space.shape[0]
+        self.action_dim = env.action_space.n
 
-# Function to select an action based on the policy
-def select_action(state):
-    state = np.array(state)
-    state = torch.from_numpy(state).float().unsqueeze(0)
-    probs = policy(state)
-    m = Categorical(probs)
-    action = m.sample()
-    return action.item(), m.log_prob(action)
+        # Initialize the policy network and optimizer
+        self.policy = Policy(self.state_dim, self.action_dim)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=0.01)
 
-# Training loop
-def policy_gradient():
-    num_episodes = 1000
-    gamma = 0.99
+        self.plot_info = plot_info
+        self.run_episodes = run_episodes
+        self.show_traces = show_traces
+        self.gamma = gamma
 
-    # Create a VideoWriter object
-    video_writer = cv2.VideoWriter('cartpole_video.avi', cv2.VideoWriter_fourcc(*'XVID'), 30.0, (600, 400))
+    
+    # Select action based on the policy function and input state
+    def select_action(self, state):
+        state = np.array(state)
+        state = torch.from_numpy(state).float().unsqueeze(0)
+        probs = self.policy(state)
+        m = Categorical(probs)
+        action = m.sample()
+        return action.item(), m.log_prob(action)
+    
 
-    # for 1000 episodes
-    for episode in range(num_episodes):
-        observations = env.reset()
+    # Use Policy Gradient Algorithm to train the model for given environment
+    def learn(self):
+        rewards_per_episode = []    # List to store rewards for each episode
+        policy_losses = []  # List to store policy loss for each episode
+
+        # for specified number of episodes
+        for episode in tqdm(range(self.num_episodes)):
+            observations = self.env.reset()
+            state = np.array(observations[0])
+            episode_reward = 0
+            log_probs = []
+            rewards = []
+
+            while True:
+                action, log_prob = self.select_action(state)
+                next_state, reward, done, truncated, _ = self.env.step(action)
+
+                log_probs.append(log_prob)
+                rewards.append(reward)
+                episode_reward += reward
+
+                if done or truncated:
+                    break
+
+                state = next_state
+
+            # Compute discounted rewards
+            discounts = [self.gamma**i for i in range(len(rewards))]
+            discounted_rewards = [discount * reward for discount, reward in zip(discounts, rewards)]
+
+            # Convert into Tensor and normalize discounted rewards
+            discounted_rewards = torch.Tensor(discounted_rewards)
+            discounted_rewards -= torch.mean(discounted_rewards)
+            discounted_rewards /= torch.std(discounted_rewards)
+
+            # Compute Policy Loss
+            policy_loss = []
+            for log_prob, reward in zip(log_probs, discounted_rewards):
+                policy_loss.append(-log_prob * reward)
+            policy_loss = torch.cat(policy_loss).sum()
+
+            # Update Policy Network
+            self.optimizer.zero_grad()
+            policy_loss.backward()
+            self.optimizer.step()
+
+            # Print the reward trace if needed
+            if episode % 100 == 0 and self.show_traces:
+                print('Episode {}: reward = {}'.format(episode, episode_reward))
+
+            rewards_per_episode.append(episode_reward)
+
+        if self.plot_info == True:
+            self._plot_rewards(rewards_per_episode, policy_losses)
+
+
+    # Plot the reward and policy loss trace for each episode
+    def _plot_info(self, rewards_per_episode, policy_losses):
+        plt.figure(figsize=(10, 5))
+        plt.subplot(1, 2, 1)
+        plt.plot(rewards_per_episode)
+        plt.xlabel('Episode')
+        plt.ylabel('Reward')
+        plt.title('Reward per Episode')
+
+        plt.subplot(1, 2, 2)
+        plt.plot(policy_losses)
+        plt.xlabel('Episode')
+        plt.ylabel('Policy Loss')
+        plt.title('Policy Loss per Episode')
+
+        plt.tight_layout()
+        plt.show()
+
+    # Save the trained model into a specified place
+    # Since the algorithm is policy gradient, we're just updating the policy approximation function
+    # the only 'model' needed to be saved is the policy
+    def save_model(self, filename):
+        torch.save(self.policy.state_dict(), filename)
+
+
+    # Load the trained model and apply the policy trained
+    def load_model(self, filename):
+        self.policy.load_state_dict(torch.load(filename))
+        self.policy.eval()  # Set the policy network to evaluation mode
+
+    # Run the trained model accordingly
+    def run_model(self, max_steps=1000):
+        observations = self.env.reset()
         state = np.array(observations[0])
-        episode_reward = 0
-        log_probs = []
-        rewards = []
+        total_reward = 0
 
-        # loop through each time step in one episode
-        while True:
-            action, log_prob = select_action(state)
-            next_state, reward, done, _, _ = env.step(action)
+        for step in range(max_steps):
+            action, _ = self.select_action(state)
+            next_state, reward, done, truncated, _ = self.env.step(action)
 
-            log_probs.append(log_prob)
-            rewards.append(reward)
-            episode_reward += reward
+            total_reward += reward
 
-            if done:
+            if done or truncated:
                 break
 
-            state = next_state
-            # Visualize the frame
-            frame = env.render()
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert color channels from RGB to BGR for video
-            frame = cv2.resize(frame, (600, 400))  # Resize the frame to fit the video dimensions
-            video_writer.write(frame)
-            
+            state = np.array(next_state)
 
-        # Compute the discounted rewards
-        discounts = [gamma**i for i in range(len(rewards))]
-        discounted_rewards = [discount * reward for discount, reward in zip(discounts, rewards)]
-
-        # Convert the discounted_rewards into a Tensor
-        discounted_rewards = torch.Tensor(discounted_rewards)
-
-        # Normalize the discounted rewards        
-        discounted_rewards -= torch.mean(discounted_rewards)
-        discounted_rewards /= torch.std(discounted_rewards)
-
-        # Calculate the loss
-        policy_loss = []
-        for log_prob, reward in zip(log_probs, discounted_rewards):
-            policy_loss.append(-log_prob * reward)
-        policy_loss = torch.cat(policy_loss).sum()
-
-        # Update the policy network
-        optimizer.zero_grad()
-        policy_loss.backward()
-        optimizer.step()
-
-        # Print the episode statistics
-        if episode % 10 == 0:
-            print('Episode {}: reward = {}'.format(episode, episode_reward))
-    
-    # Release the VideoWriter object
-    video_writer.release()
-
-
-# Train the policy network
-policy_gradient()
+        return total_reward
