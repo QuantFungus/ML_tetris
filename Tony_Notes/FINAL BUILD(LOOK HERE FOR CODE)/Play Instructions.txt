@@ -1,0 +1,30 @@
+GAME INSTRUCTIONS:
+
+On the game selection screen, enter the size of the maze you want
+inside the Row and Col text fields. Do not try to use numbers less than 2
+or greater than 13, doing so will make the row and/or col values
+default to 2 if lower and 13 if higher. 
+
+Click on the box next to "Use Mouse" to use mouse movement. Leaving
+the box unchecked will enable WASD movement.
+
+Clicking the Maze will generate a maze, and clicking on Labyrinth will generate a Labyrinth
+(the difference is that a Labyrinth is just a single long path).
+
+You control the red shape, the goal is to get the red shape to the green goal that is placed
+somewhere in the maze/labyrinth.
+
+For WASD:
+-W to move up
+-A to move Left
+-D to move right
+-S to move down
+-Attempting to move into walls will result in you not moving
+
+For Mouse:
+-Click to enable/disable controlling the player character/red shape. While enabled, the player
+will follow your mouses movements.
+-Unlike WASD, you are able to move into walls. Doing this will disable your control over the player and you'll
+need to click again.
+
+Clicking on any red X will close the game.
