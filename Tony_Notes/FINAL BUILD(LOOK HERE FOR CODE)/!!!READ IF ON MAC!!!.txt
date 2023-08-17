@@ -1,0 +1,11 @@
+*I built this on Windows, and there is a small issue Unity has when you build a Mac application on Windows.
+To fix, do this:*
+
+Open your terminal, and do:
+cd <PATH_TO_UNZIPPED_MACVERSION>/MacBuild
+
+Once you change to that directory, do:
+chmod -R 777 MacBuild.app
+
+After running that command, try opening the application. It should work.
+If not, let me know and I'll try to further fix or find workarounds for this Unity Issue.
